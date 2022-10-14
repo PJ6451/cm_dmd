@@ -17,7 +17,6 @@ NT = int((tf-t0)/dt)
 tvals = np.linspace(t0,tf,NT+1)
 numiconds = 80
 num_dim = 3
-initconds = np.zeros((numiconds,3), dtype=np.float64)
 
 icx = np.random.uniform(-15, 15, numiconds)
 icy = np.random.uniform(-20, 20, numiconds)
@@ -25,11 +24,9 @@ icz = np.random.uniform(0, 40, numiconds)
 tspan = np.array([0, tf])
 dts = np.arange(0, tf, dt)
 rawdata = np.zeros(shape=(num_dim, numiconds, NT))
-initconds[:,0] = icx
-initconds[:,1] = icy
-initconds[:,2] = icz
+initconds = np.array([icx,icy,icz]).T
 
-for ii, ic in enumerate(zip(icx, icy, icz)):
+for ii, ic in enumerate(initconds):
     tmp = solve_ivp(lorenz, t_span=tspan, y0=ic, method='RK45', t_eval=dts)
     rawdata[:, ii, :] = tmp.y
 
