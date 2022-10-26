@@ -68,13 +68,6 @@ def path_reconstruction(phim, initconds, num_dim, numiconds, NT):
 
     return recon
 
-def path_reconstruction(phim, window, initconds):
-    phimat = phim[:, ::(window - 1)]
-    u, s, vh = np.linalg.svd(phimat.T, full_matrices=False)
-    kmat = np.conj(vh.T) @ np.diag(1. / s) @ np.conj(u.T) @ initconds
-    recon = np.real(kmat.T @ phim)
-    return recon
-
 def path_test(query_pts, initconds, phim, evls, window):
     Nobs = np.shape(phim)[0]
     Nqp = np.shape(query_pts)[0]
