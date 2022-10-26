@@ -24,22 +24,21 @@ icz = np.random.uniform(0, 40, numiconds)
 tspan = np.array([0, tf])
 dts = np.arange(0, tf, dt)
 rawdata = np.zeros(shape=(num_dim, numiconds, NT))
-initconds = np.array([icx,icy,icz]).T
+initconds = np.array([icx,icy,icz])
 
-for ii, ic in enumerate(initconds):
+for ii, ic in enumerate(initconds.T):
     tmp = solve_ivp(lorenz, t_span=tspan, y0=ic, method='RK45', t_eval=dts)
     rawdata[:, ii, :] = tmp.y
 
 thrshhld = 15.
-evls, phim, kvecs = cm_dmd(rawdata, num_dim, numiconds, NT)
+evals, phim, evecs = cm_dmd(rawdata, num_dim, numiconds, NT)
 recon = path_reconstruction(phim, initconds, num_dim, numiconds, NT)
-recon = np.reshape(recon, (num_dim, numiconds))
 
 fig = plt.figure(figsize = (10, 7))
 ax = plt.axes(projection ="3d")
 traj = rawdata[:,0,:]
-ax.plot3D(traj[0,:], traj[1,:], traj[2,:],label='rk4')
-ax.plot3D(recon[0,:], recon[1,:], recon[2,:],label='cmdmd')
+#ax.plot3D(traj[0,:], traj[1,:], traj[2,:],label='rk4')
+ax.plot3D(recon[0,:,0], recon[1,:,0], recon[2,:,0],label='cmdmd')
 ax.legend()
 #fig.savefig("lorentz96_hdmd_234", dpi=200)
 plt.show()

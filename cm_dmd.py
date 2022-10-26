@@ -1,61 +1,79 @@
 import numpy as np
 from scipy.linalg import toeplitz as toep
-import tensorflow as tf
 
 def cm_dmd(rawdata, num_dim, numiconds, NT):
     # assign values for regression
     y_end = rawdata[:,:,-1]
     Y_arma = rawdata[:,:,:-1]
+    print(np.linalg.cond(Y_arma))
     
     #svd and building companion matrix
     u, s, vh = np.linalg.svd(Y_arma, full_matrices=False)
-    v = np.zeros((num_dim, NT-1, numiconds))
-    uh = np.zeros((num_dim,numiconds,numiconds))
-    sig = np.zeros((num_dim,numiconds,numiconds))
-    comp_mat = np.zeros([num_dim,NT-1,NT-1])
-    comp_mat_diag = np.array([1]*(NT-2))
-    comp_mat_ones = np.diag(comp_mat_diag, k = -1)
-    for i in range(num_dim):
-        v[i,:,:] = np.conj(vh[i,:,:].T)
-        uh[i,:,:] = np.conj(u[i,:,:].T)
-        sig[i,:,:] = np.diag(1/s[i])
-        comp_mat[i,:,:] = comp_mat_ones
+
+    v = batch_conj_transpose(vh,[num_dim, NT-1, numiconds])
+    uh = batch_conj_transpose(u,[num_dim,numiconds,numiconds])
+    sig = batch_build_sigma(s, [num_dim,numiconds,numiconds])
+    comp_mat = build_comp_mat(num_dim, NT)
         
     c = v @ sig @ uh @ y_end[...,None]
     comp_mat[:,:,-1] = c[:,:,0]
 
     #calculating eigenvalues/vectors/modes
     kmat = comp_mat
-    evls, evcs = np.linalg.eig(kmat)
-    phim = np.linalg.solve(evcs, np.reshape(Y_arma,[num_dim, NT-1, numiconds]))
-    return evls, phim, evcs
+    evals, evecs = np.linalg.eig(kmat)
+    phim = Y_arma @ evecs
 
+    #Vandermonde Matrix
+    v_m = np.zeros((num_dim,NT-1,NT-1))
+    for j in range(NT-1):
+        v_m[:,:,j] = evals**j    
+    print(np.linalg.cond(v_m))
+    
+    return evals, phim, evecs
+
+def batch_conj_transpose(A: np.ndarray, dim: list):
+    A_t = np.zeros(dim)
+    for i in range(dim[0]):
+        A_t[i,:,:] = np.conj(A[i,:,:].T)    
+    return A_t
+
+def batch_build_sigma(s: np.ndarray, dim: list):
+    sig = np.zeros(dim)
+    for i in range(dim[0]):
+        sig[i,:,:] = np.diag(1/s[i])
+    return sig
+
+def build_comp_mat(num_dim, NT):
+    comp_mat = np.zeros([num_dim,NT-1,NT-1])
+    comp_mat_diag = np.array([1]*(NT-2))
+    comp_mat_ones = np.diag(comp_mat_diag, k = -1)
+    for i in range(num_dim):       
+        comp_mat[i,:,:] = comp_mat_ones
+    return comp_mat
 
 def path_reconstruction(phim, initconds, num_dim, numiconds, NT):
     #constructing phimat
-    phimat_t = np.zeros([num_dim, numiconds, NT-1])
-    for i in range(num_dim):
-        phimat_t[i,:,:] = phim[i,:,:].T
+    phimat_t = batch_conj_transpose(phim,[num_dim, NT-1, numiconds])
     
     #svd to construct kmat
     u, s, vh = np.linalg.svd(phimat_t, full_matrices=False)
-    v = np.zeros((num_dim, NT-1, numiconds))
-    uh = np.zeros((num_dim, numiconds, numiconds))
-    sig = np.zeros((num_dim, numiconds, numiconds))
-    for i in range(num_dim):
-        v[i,:,:] = np.conj(vh[i,:,:].T)
-        uh[i,:,:] = np.conj(u[i,:,:].T)
-        sig[i,:,:] = np.diag(1/s[i])
+    v = batch_conj_transpose(vh,[num_dim, numiconds, numiconds])
+    uh = batch_conj_transpose(u,[num_dim, numiconds, NT-1])
+    sig = batch_build_sigma(s,[num_dim, numiconds, numiconds])
     
     #kmat and reconstruction of trajectories
-    kmat = v @ sig @ uh @ initconds.T[...,None]
-    kmat_t = np.zeros([num_dim, 1, NT-1])
-    for i in range(num_dim):
-        kmat_t[i,:,:] = kmat[i,:,:].T
-    
+    kmat =  v @ sig @ uh @ initconds[...,None]
+    kmat_t = batch_conj_transpose(kmat,[num_dim, numiconds, NT-1])
     recon = np.real(kmat_t @ phim)
+
     return recon
 
+def path_reconstruction(phim, window, initconds):
+    phimat = phim[:, ::(window - 1)]
+    u, s, vh = np.linalg.svd(phimat.T, full_matrices=False)
+    kmat = np.conj(vh.T) @ np.diag(1. / s) @ np.conj(u.T) @ initconds
+    recon = np.real(kmat.T @ phim)
+    return recon
 
 def path_test(query_pts, initconds, phim, evls, window):
     Nobs = np.shape(phim)[0]
