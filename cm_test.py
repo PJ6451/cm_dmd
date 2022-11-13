@@ -43,17 +43,26 @@ else:
 
 
 thrshhld = 15.
-recon = cm_dmd(rawdata, num_dim, numiconds, NT, thrshhld)
+stacked_data = np.zeros([numiconds*num_dim, NT])
+for i in range(num_dim):
+    stacked_data[(i)*numiconds:(i+1)*numiconds,:] = rawdata[i,:,:]
+
+recon, m = cm_dmd(stacked_data, NT, thrshhld)
 #recon = path_reconstruction(phim, initconds, num_dim, numiconds, NT)
 
-fig = plt.figure(figsize = (10, 7))
-recon_1 = recon[:,0,:]
-traj = rawdata[:,0,:]
-ax = fig.add_subplot(1, 2, 1, projection='3d')
-ax.plot3D(traj[0,:], traj[1,:], traj[2,:],label='rk4')
-ax.legend()
-ax = fig.add_subplot(1, 2, 2, projection='3d')
-ax.plot3D(recon_1[0,:], recon_1[1,:], recon_1[2,:],label='cmdmd')
-ax.legend()
-#fig.savefig("lorentz96_hdmd_234", dpi=200)
-plt.show()
+unstacked_data = np.zeros([num_dim,numiconds, m])
+for i in range(num_dim):
+    unstacked_data[i,:,:] = recon[(i)*numiconds:(i+1)*numiconds,:]
+
+for i in range(80):
+    fig = plt.figure(figsize = (10, 7))
+    recon_1 = unstacked_data[:,i,:]
+    traj = rawdata[:,i,:m]
+    ax = fig.add_subplot(1, 2, 1, projection='3d')
+    ax.plot3D(traj[0,:], traj[1,:], traj[2,:],label='rk4')
+    ax.legend()
+    ax = fig.add_subplot(1, 2, 2, projection='3d')
+    ax.plot3D(recon_1[0,:], recon_1[1,:], recon_1[2,:],label='cmdmd')
+    ax.legend()
+    #fig.savefig("lorentz96_hdmd_234", dpi=200)
+    plt.show()

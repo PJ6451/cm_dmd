@@ -1,72 +1,56 @@
 import numpy as np
 from scipy.linalg import toeplitz as toep
+import matplotlib.pyplot as plt
 
-def cm_dmd(rawdata, num_dim, numiconds, NT, thrshhld):
-    recon = np.zeros([num_dim,numiconds,NT])
+def cm_dmd(rawdata, NT, thrshhld):
     # assign values for regression
-    y_end = rawdata[:,:,-1]
-    Y_arma = rawdata[:,:,:-1]
+    y_end = rawdata[:,-1]
+    Y_arma = rawdata[:,:-1]
 
     #svd and building companion matrix
     u, s, vh = np.linalg.svd(Y_arma, full_matrices=False)
-
-    v = batch_conj_transpose(vh,[num_dim, NT-1, numiconds])
-    uh = batch_conj_transpose(u,[num_dim, numiconds,numiconds])
-    sig = batch_build_sigma(s, [num_dim, numiconds,numiconds])
-    comp_mat = build_comp_mat(num_dim, NT)
+    sm = np.max(s)
+    indskp = np.log10(s / sm) > -thrshhld
+    sr = s[indskp]
+    ur = u[:, indskp]
+    v = np.conj(vh.T)
+    vr = v[:, indskp]
         
-    c = v @ sig @ uh @ y_end[...,None]
-    comp_mat[:,:,-1] = c[:,:,0]
+    c = vr @ np.diag(1. / sr) @ np.conj(ur.T) @ y_end
+    comp_mat = np.diag(np.array([1.]*(NT-2)), k = -1)
+    comp_mat[:,-1] = c
 
     #calculating eigenvalues/vectors/modes
     evals, evecs = np.linalg.eig(comp_mat)
-    modes = Y_arma @ evecs
+    evls_pwr = np.abs(evals**(NT-1))
     
+    #refactor m based on eigenvalues
+    ind = np.where(evls_pwr > 60)
+    m = ind[0][0]
+    evals = evals[:m]
+    evecs = evecs[:m,:m]
+    modes = Y_arma[:,:m] @ evecs
+    modes = modes[:,:m]
+    #plot_eigs(evals)
+    
+    recon = np.zeros([rawdata.shape[0], m])
+    for i in range(m):
+        recon[:,i] = np.real(modes @ evals**i)
     #Vandermonde Matrix
-    #v_m = build_vandermonde(0, NT, evals)
-    #c_mat_test = np.real(evecs @ np.diag(evals) @ v_m)
-    #aaa = np.allclose(comp_mat, c_mat_test, rtol=1e-05)
-    
-    recon[:,:,:-1] = modes @ np.linalg.pinv(evecs)
-    recon[:,:,-1] = (recon[:,:,:-1] @ c)[:,:,0]
+    #v_m = np.vander(evals, N = m, increasing=True)
 
+    return recon, m
+
+def path_reconstruction(phim, window, initconds):
+    phimat = phim[:, ::(window - 1)]
+    u, s, vh = np.linalg.svd(phimat.T, full_matrices=False)
+    kmat = np.conj(vh.T) @ np.diag(1. / s) @ np.conj(u.T) @ initconds
+    recon = np.real(kmat.T @ phim)
     return recon
 
-def batch_conj_transpose(A: np.ndarray, dim: list):
-    if np.size(dim) > 0:
-        A_t = np.zeros(dim)
-        for i in range(dim[0]):
-            A_t[i,:,:] = np.conj(A[i,:,:].T)    
-        return A_t
-    else:
-        return np.conj(A.T)
-
-def batch_build_sigma(s: np.ndarray, dim: list):
-    if np.size(dim) > 0:
-        sig = np.zeros(dim)
-        for i in range(dim[0]):
-            sig[i,:,:] = np.diag(1/s[i])
-        return sig
-    else:
-        return np.diag(1/s)
-
-def build_comp_mat(num_dim, NT):
-    if num_dim > 0:
-        comp_mat = np.zeros([num_dim,NT-1,NT-1])
-        comp_mat_diag = np.array([1]*(NT-2))
-        comp_mat_ones = np.diag(comp_mat_diag, k = -1)
-        for i in range(num_dim):       
-            comp_mat[i,:,:] = comp_mat_ones
-        return comp_mat
-    else:
-        comp_mat = np.diag(np.array([1.]*(NT-2)), k = -1)
-        return comp_mat
-
-def build_vandermonde(num_dim, NT, evals):
-    if num_dim > 0:
-        v_m = np.zeros((num_dim,NT-1,NT-1)) 
-        for i in range(num_dim):
-            v_m[i,:,:] = np.vander(evals[i,:], N = NT-1, increasing=True)
-        return v_m
-    else:
-        return np.vander(evals, N = NT-1, increasing=True)
+def plot_eigs(evals):
+    fig = plt.figure(figsize = (10, 7))
+    plt.scatter(evals.real, evals.imag)
+    plt.xlabel("real")
+    plt.ylabel("imag")
+    plt.show()

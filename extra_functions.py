@@ -20,21 +20,11 @@ def path_reconstruction_arnoldi(evecs, evals, initconds, num_dim, numiconds, NT)
     recon = np.concatenate((recon, f_NT),axis=2)
     return recon
 
-def path_reconstruction(phim, initconds, num_dim, numiconds, NT):
-    #constructing phimat
-    phimat_t = batch_conj_transpose(phim,[num_dim, NT-1, numiconds])
-    
-    #svd to construct kmat
-    u, s, vh = np.linalg.svd(phimat_t, full_matrices=False)
-    v = batch_conj_transpose(vh,[num_dim, numiconds, numiconds])
-    uh = batch_conj_transpose(u,[num_dim, numiconds, NT-1])
-    sig = batch_build_sigma(s,[num_dim, numiconds, numiconds])
-    
-    #kmat and reconstruction of trajectories
-    kmat =  v @ sig @ uh @ initconds[...,None]
-    kmat_t = batch_conj_transpose(kmat,[num_dim, numiconds, NT-1])
-    recon = np.real(kmat_t @ phim)
-
+def path_reconstruction(phim, window, initconds):
+    phimat = phim[:, ::(window - 1)]
+    u, s, vh = np.linalg.svd(phimat.T, full_matrices=False)
+    kmat = np.conj(vh.T) @ np.diag(1. / s) @ np.conj(u.T) @ initconds
+    recon = np.real(kmat.T @ phim)
     return recon
 
 def path_test(query_pts, initconds, phim, evls, window):
@@ -85,3 +75,43 @@ def build_comp_mat(num_dim, NT):
     for i in range(num_dim):       
         comp_mat[i,:,:] = comp_mat_ones
     return comp_mat
+
+def batch_conj_transpose(A: np.ndarray, dim: list):
+    if np.size(dim) > 0:
+        A_t = np.zeros(dim)
+        for i in range(dim[0]):
+            A_t[i,:,:] = np.conj(A[i,:,:].T)    
+        return A_t
+    else:
+        return np.conj(A.T)
+
+def batch_build_sigma(s: np.ndarray, dim: list):
+    if np.size(dim) > 0:
+        sig = np.zeros(dim)
+        for i in range(dim[0]):
+            sig[i,:,:] = np.diag(1/s[i])
+        return sig
+    else:
+        return np.diag(1/s)
+
+def build_comp_mat(num_dim, NT):
+    if num_dim > 0:
+        comp_mat = np.zeros([num_dim,NT-1,NT-1])
+        comp_mat_diag = np.array([1]*(NT-2))
+        comp_mat_ones = np.diag(comp_mat_diag, k = -1)
+        for i in range(num_dim):       
+            comp_mat[i,:,:] = comp_mat_ones
+        return comp_mat
+    else:
+        comp_mat = np.diag(np.array([1.]*(NT-2)), k = -1)
+        return comp_mat
+
+def build_vandermonde(num_dim, NT, evals):
+    evals = evals.T
+    if num_dim > 0:
+        v_m = np.zeros((num_dim,NT-1,NT-1)) 
+        for i in range(num_dim):
+            v_m[i,:,:] = np.vander(evals[:,i], N = NT-1, increasing=True)
+        return v_m
+    else:
+        return np.vander(evals, N = NT-1, increasing=True)
