@@ -22,16 +22,15 @@ def cm_dmd(rawdata, NT, thrshhld):
 
     #calculating eigenvalues/vectors/modes
     evals, evecs = np.linalg.eig(comp_mat)
-    evls_pwr = np.abs(evals**(NT-1))
-    
+    mag_evals = np.abs(evals)
+    #plot_eigs(evals)
+
     #refactor m based on eigenvalues
-    ind = np.where(evls_pwr > 60)
+    ind = np.where(mag_evals < .99)
     m = ind[0][0]
     evals = evals[:m]
     evecs = evecs[:m,:m]
     modes = Y_arma[:,:m] @ evecs
-    modes = modes[:,:m]
-    #plot_eigs(evals)
     
     recon = np.zeros([rawdata.shape[0], m])
     for i in range(m):
@@ -39,7 +38,7 @@ def cm_dmd(rawdata, NT, thrshhld):
     #Vandermonde Matrix
     #v_m = np.vander(evals, N = m, increasing=True)
 
-    return recon, m
+    return recon, modes, m
 
 def path_reconstruction(phim, window, initconds):
     phimat = phim[:, ::(window - 1)]

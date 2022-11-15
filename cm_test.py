@@ -6,15 +6,15 @@ import pickle
 import os
 
 def lorenz(t, X, sigma=10, beta=2.667, rho=28):
-        u, v, w = X
-        up = -sigma * (u - v)
-        vp = rho * u - v - u * w
-        wp = -beta * w + u * v
-        return up, vp, wp
+    u, v, w = X
+    up = -sigma * (u - v)
+    vp = rho * u - v - u * w
+    wp = -beta * w + u * v
+    return up, vp, wp
 
 dt = .05
 t0 = 0.
-tf = 20.
+tf = 90.
 NT = int((tf-t0)/dt)
 tvals = np.linspace(t0,tf,NT+1)
 numiconds = 80
@@ -40,21 +40,23 @@ else:
     
     pickle.dump(rawdata, open(data_fname, 'wb'))
 
-
-
 thrshhld = 15.
+window = NT-1
+#stack data
 stacked_data = np.zeros([numiconds*num_dim, NT])
 for i in range(num_dim):
     stacked_data[(i)*numiconds:(i+1)*numiconds,:] = rawdata[i,:,:]
 
-recon, m = cm_dmd(stacked_data, NT, thrshhld)
-#recon = path_reconstruction(phim, initconds, num_dim, numiconds, NT)
+#dmd
+recon, phim, m = cm_dmd(stacked_data, NT, thrshhld)
 
+#unstack data
 unstacked_data = np.zeros([num_dim,numiconds, m])
 for i in range(num_dim):
     unstacked_data[i,:,:] = recon[(i)*numiconds:(i+1)*numiconds,:]
 
-for i in range(80):
+#compare plots of reconstruction with raw data
+for i in range(5):
     fig = plt.figure(figsize = (10, 7))
     recon_1 = unstacked_data[:,i,:]
     traj = rawdata[:,i,:m]
@@ -64,5 +66,4 @@ for i in range(80):
     ax = fig.add_subplot(1, 2, 2, projection='3d')
     ax.plot3D(recon_1[0,:], recon_1[1,:], recon_1[2,:],label='cmdmd')
     ax.legend()
-    #fig.savefig("lorentz96_hdmd_234", dpi=200)
-    plt.show()
+    fig.savefig("lorenz_cmdmd" + str(i), dpi=200)
