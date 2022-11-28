@@ -48,7 +48,7 @@ for i in range(num_dim):
     stacked_data[(i)*numiconds:(i+1)*numiconds,:] = rawdata[i,:,:]
 
 #dmd
-recon, phim, m = cm_dmd(stacked_data, NT, thrshhld)
+recon, phim, m = cm_dmd(stacked_data, NT, thrshhld, tvals, dt)
 
 #unstack data
 unstacked_data = np.zeros([num_dim,numiconds, m])

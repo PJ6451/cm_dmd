@@ -2,13 +2,13 @@ import numpy as np
 from scipy.linalg import toeplitz as toep
 import matplotlib.pyplot as plt
 
-def cm_dmd(rawdata, NT, thrshhld):
+def cm_dmd(rawdata, NT, thrshhld, tvals, dt):
     # assign values for regression
-    y_end = rawdata[:,-1]
-    Y_arma = rawdata[:,:-1]
+    y = rawdata[:,-1]
+    X = rawdata[:,:-1]
 
     #svd and building companion matrix
-    u, s, vh = np.linalg.svd(Y_arma, full_matrices=False)
+    u, s, vh = np.linalg.svd(X, full_matrices=False)
     sm = np.max(s)
     indskp = np.log10(s / sm) > -thrshhld
     sr = s[indskp]
@@ -16,7 +16,7 @@ def cm_dmd(rawdata, NT, thrshhld):
     v = np.conj(vh.T)
     vr = v[:, indskp]
         
-    c = vr @ np.diag(1. / sr) @ np.conj(ur.T) @ y_end
+    c = vr @ np.diag(1. / sr) @ np.conj(ur.T) @ y
     comp_mat = np.diag(np.array([1.]*(NT-2)), k = -1)
     comp_mat[:,-1] = c
 
@@ -30,13 +30,11 @@ def cm_dmd(rawdata, NT, thrshhld):
     m = ind[0][0]
     evals = evals[:m]
     evecs = evecs[:m,:m]
-    modes = Y_arma[:,:m] @ evecs
+    modes = np.dot(X[:,:m], evecs)
     
     recon = np.zeros([rawdata.shape[0], m])
     for i in range(m):
         recon[:,i] = np.real(modes @ evals**i)
-    #Vandermonde Matrix
-    #v_m = np.vander(evals, N = m, increasing=True)
 
     return recon, modes, m
 
